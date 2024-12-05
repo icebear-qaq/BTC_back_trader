@@ -85,5 +85,4 @@ class VWAPEMA200Strategy(bt.Strategy):
             trade_records.append([buy_price, buy_date, sell_price, sell_date, profit, close_reason])
 
         trade_df = pd.DataFrame(trade_records, columns=['开仓点', '开仓时间', '平仓点', '平仓时间', '收益', '平仓原因'])
-        print("\n交易记录:")
-        print(trade_df)
+        trade_df.to_csv('交易记录.csv', index=False)

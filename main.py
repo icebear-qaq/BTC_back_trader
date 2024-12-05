@@ -3,7 +3,7 @@ from data_loader.data_loader import load_data
 from strategies.vwap_ema200_strategy import VWAPEMA200Strategy
 
 # 定义文件路径
-data_dir = 'downloads'
+data_dir = 'test'
 
 # 加载数据
 combined_df = load_data(data_dir)
@@ -24,32 +24,41 @@ class PandasData(bt.feeds.PandasData):
         ('close_time', None),
     )
 
-# 创建Cerebro引擎
-cerebro = bt.Cerebro()
+def run_cerebro(params):
+    cerebro = bt.Cerebro()
+    cerebro.addstrategy(VWAPEMA200Strategy, cerebro=cerebro, **params)
+    cerebro.broker.set_cash(1000)
+    cerebro.broker.setcommission(commission=0.0002)
+    cerebro.adddata(PandasData(dataname=combined_df))
+    cerebro.run()
+    return cerebro.broker.get_value()
 
-# 加载数据
-data = PandasData(dataname=combined_df)
+if __name__ == '__main__':
+    # 创建Cerebro引擎
+    cerebro = bt.Cerebro()
 
-# 将数据添加到Cerebro引擎
-cerebro.adddata(data)
+    # 加载数据
+    data = PandasData(dataname=combined_df)
 
-# 添加策略
-cerebro.addstrategy(VWAPEMA200Strategy, cerebro=cerebro)
+    # 将数据添加到Cerebro引擎
+    cerebro.adddata(data)
 
-# 设置初始资金
-cerebro.broker.set_cash(1000)
+    # 设置优化参数
+    params_list = [
+        {'vwap_period': vwap_period, 'ema_period': ema_period, 'take_profit': take_profit, 'stop_loss': stop_loss}
+        for vwap_period in range(10, 20)
+        for ema_period in range(180, 220)
+        for take_profit in [0.03, 0.04, 0.05]
+        for stop_loss in [0.005, 0.008, 0.01]
+    ]
 
-# 设置佣金
-cerebro.broker.setcommission(commission=0.0002)
+    # 运行优化
+    results = []
+    for params in params_list:
+        value = run_cerebro(params)
+        results.append((params, value))
 
-# 输出初始资金
-print(f'初始资金: {cerebro.broker.get_value()}')
-
-# 运行回测
-cerebro.run()
-
-# 输出最终资金
-print(f'最终资金: {cerebro.broker.get_value()}')
-
-# 绘制结果
-#cerebro.plot()
+    # 输出最佳参数组合
+    best_result = max(results, key=lambda x: x[1])
+    print(f"最佳参数组合: {best_result[0]}")
+    print(f"最佳回报: {best_result[1]}")
