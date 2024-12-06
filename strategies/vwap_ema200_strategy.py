@@ -4,76 +4,81 @@ from indicators.vwap import VWAP
 
 class VWAPEMA200Strategy(bt.Strategy):
     params = (
-        ('vwap_period', 14),  # VWAP周期
-        ('ema_period', 200),  # EMA200周期
-        ('take_profit', 0.04),  # 止盈阈值 (0.6%)
-        ('stop_loss', 0.008),  # 止损阈值 (0.4%)
+        ('vwap_period', 14),  # VWAP period
+        ('ema_period', 200),  # EMA200 period
+        ('take_profit', 0.008),  # Take profit threshold (0.6%)
+        ('stop_loss', 0.006),  # Stop loss threshold (0.4%)
     )
 
     def __init__(self, cerebro):
-        # 计算VWAP (自定义实现)
+        # Calculate VWAP (custom implementation)
         self.vwap = VWAP(self.data, period=self.params.vwap_period)
-        # 计算EMA200
+        # Calculate EMA200
         self.ema200 = bt.indicators.ExponentialMovingAverage(self.data.close, period=self.params.ema_period)
         self.buy_price = None
         self.buy_date = None
-        self.trades = []  # 用于保存交易记录
-        self.cerebro = cerebro  # 传递 cerebro 对象
+        self.trades = []  # To store trade records
+        self.cerebro = cerebro  # Pass the cerebro object
 
     def notify_order(self, order):
         if order.status == order.Completed:
             if order.isbuy():
-                print(f"买入成功，价格: {order.executed.price}, 数量: {order.executed.size}")
+                print(f"Buy successful, price: {order.executed.price}, size: {order.executed.size}")
             elif order.issell():
-                print(f"卖出成功，价格: {order.executed.price}, 数量: {order.executed.size}")
+                print(f"Sell successful, price: {order.executed.price}, size: {order.executed.size}")
         elif order.status == order.Canceled:
-            print("订单被取消")
+            print("Order canceled")
         elif order.status == order.Margin:
-            print("订单由于保证金不足未能执行")
+            print("Order not executed due to insufficient margin")
         elif order.status == order.Rejected:
-            print("订单被拒绝")
+            print("Order rejected")
 
     def next(self):
         if not self.position:
-            # 如果当前价格穿越VWAP，并且在EMA200之上，则买入
+            # Buy if the current price crosses above VWAP and is above EMA200
             if self.data.close[0] > self.vwap[0] and self.data.close[0] > self.ema200[0]:
                 self.buy_price = self.data.close[0]
                 self.buy_date = self.data.datetime.date(0)
-                size_to_buy = self.cerebro.broker.getvalue() / self.data.close[0]  # 用所有现金买入
+                size_to_buy = self.cerebro.broker.getvalue() / self.data.close[0]  # Use all cash to buy
                 size_to_buy = size_to_buy - size_to_buy * 0.001
                 if size_to_buy > 0:
-                    self.buy(size=size_to_buy)  # 买入
-                print(f"买入数量: {size_to_buy} BTC")
+                    self.buy(size=size_to_buy)  # Buy
+                print(f"Buy size: {size_to_buy} BTC")
         else:
-            # 判断当前价格相对于买入价格的涨跌幅
+            # Calculate the price change relative to the buy price
             price_change = (self.data.close[0] - self.position.price) / self.position.price
 
-            # 如果价格涨幅超过0.6%则止盈
+            # Take profit if the price increase exceeds 0.6%
             if price_change >= self.params.take_profit:
-                self.sell(size=self.position.size)  # 卖出持有数量
+                self.sell(size=self.position.size)  # Sell the holding size
                 self.trades.append(('buy', self.buy_date, self.buy_price, 'sell', self.data.datetime.date(0),
                                     self.data.close[0], 'take profit'))
 
-            # 如果价格跌幅超过0.4%则止损
+            # Stop loss if the price decrease exceeds 0.4%
             elif price_change <= -self.params.stop_loss:
                 self.sell(size=self.position.size)
                 self.trades.append(('buy', self.buy_date, self.buy_price, 'sell', self.data.datetime.date(0),
                                     self.data.close[0], 'stop loss'))
 
     def stop(self):
-        # 计算胜率
         profitable_trades = sum(1 for trade in self.trades if trade[6] == 'take profit')
         total_trades = len(self.trades)
         win_rate = (profitable_trades / total_trades) if total_trades > 0 else 0
 
-        # 计算回报率
+        # Calculate the return rate
         total_profit = sum((trade[5] - trade[2]) / trade[2] for trade in self.trades)
         return_rate = total_profit
 
-        print(f"策略胜率: {win_rate * 100:.2f}%")
-        print(f"总回报率: {return_rate * 100:.2f}%")
+        # Calculate the number of take profit and stop loss trades
+        take_profit_count = sum(1 for trade in self.trades if trade[6] == 'take profit')
+        stop_loss_count = sum(1 for trade in self.trades if trade[6] == 'stop loss')
 
-        # 生成交易表格
+        print(f"Strategy win rate: {win_rate * 100:.2f}%")
+        print(f"Total return rate: {return_rate * 100:.2f}%")
+        print(f"Take profit count: {take_profit_count}")
+        print(f"Stop loss count: {stop_loss_count}")
+
+        # Generate trade table
         trade_records = []
         for trade in self.trades:
             buy_date = trade[1]
@@ -84,5 +89,5 @@ class VWAPEMA200Strategy(bt.Strategy):
             close_reason = trade[6]
             trade_records.append([buy_price, buy_date, sell_price, sell_date, profit, close_reason])
 
-        trade_df = pd.DataFrame(trade_records, columns=['开仓点', '开仓时间', '平仓点', '平仓时间', '收益', '平仓原因'])
-        trade_df.to_csv('交易记录.csv', index=False)
+        trade_df = pd.DataFrame(trade_records, columns=['Entry Price', 'Entry Date', 'Exit Price', 'Exit Date', 'Profit', 'Exit Reason'])
+        trade_df.to_csv('trade_records.csv', index=False)

@@ -2,18 +2,18 @@ import backtrader as bt
 from data_loader.data_loader import load_data
 from strategies.vwap_ema200_strategy import VWAPEMA200Strategy
 
-# 定义文件路径
-data_dir = 'test'
+# Define the file path
+data_dir = 'recent'
 
-# 加载数据
+# Load the data
 combined_df = load_data(data_dir)
 
-# 创建一个Backtrader的数据feed
+# Create a Backtrader data feed
 class PandasData(bt.feeds.PandasData):
-    # 设置DataFrame的列名映射
+    # Set the DataFrame column name mapping
     lines = ('amount',)
     params = (
-        ('datetime', None),  # datetime列会使用索引
+        ('datetime', None),  # The datetime column will use the index
         ('open', 'open'),
         ('high', 'high'),
         ('low', 'low'),
@@ -34,16 +34,16 @@ def run_cerebro(params):
     return cerebro.broker.get_value()
 
 if __name__ == '__main__':
-    # 创建Cerebro引擎
+    # Create the Cerebro engine
     cerebro = bt.Cerebro()
 
-    # 加载数据
+    # Load the data
     data = PandasData(dataname=combined_df)
 
-    # 将数据添加到Cerebro引擎
+    # Add the data to the Cerebro engine
     cerebro.adddata(data)
 
-    # 设置优化参数
+    # Set the optimization parameters
     params_list = [
         {'vwap_period': vwap_period, 'ema_period': ema_period, 'take_profit': take_profit, 'stop_loss': stop_loss}
         for vwap_period in range(10, 20)
@@ -52,13 +52,17 @@ if __name__ == '__main__':
         for stop_loss in [0.005, 0.008, 0.01]
     ]
 
-    # 运行优化
-    results = []
-    for params in params_list:
-        value = run_cerebro(params)
-        results.append((params, value))
+    print("To enter the parameter optimization process, please input: 1, else input any key")
+    if input() == "1":
+        # Run the optimization
+        results = []
+        for params in params_list:
+            value = run_cerebro(params)
+            results.append((params, value))
 
-    # 输出最佳参数组合
-    best_result = max(results, key=lambda x: x[1])
-    print(f"最佳参数组合: {best_result[0]}")
-    print(f"最佳回报: {best_result[1]}")
+        # Output the best parameter combination
+        best_result = max(results, key=lambda x: x[1])
+        print(f"Best parameter combination: {best_result[0]}")
+        print(f"Best return: {best_result[1]}")
+    else:
+        run_cerebro(params={'vwap_period': 10, 'ema_period': 180, 'take_profit': 0.008, 'stop_loss': 0.006})

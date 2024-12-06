@@ -4,36 +4,36 @@ class VWAP(bt.Indicator):
     lines = ('vwap',)
 
     params = (
-        ('period', 14),  # 默认14周期
+        ('period', 14),  # Default period of 14
     )
 
     def __init__(self):
-        # 创建累积总价 * 成交量（成交额）和累积成交量
+        # Create cumulative total price * volume (total value) and cumulative volume
         self.addminperiod(self.params.period)
-        self.initialized = False  # 添加一个标志位，用于初始化
-        self.total_vol = 0  # 累计成交量
-        self.total_value = 0  # 累计成交额
+        self.initialized = False  # Add a flag to indicate initialization
+        self.total_vol = 0  # Cumulative volume
+        self.total_value = 0  # Cumulative total value
 
     def next(self):
-        # 初始化VWAP
+        # Initialize VWAP
         if not self.initialized:
-            self.lines.vwap[0] = 0  # 初始化VWAP为0
-            self.initialized = True  # 设置标志位，表示已经初始化
+            self.lines.vwap[0] = 0  # Initialize VWAP to 0
+            self.initialized = True  # Set the flag to indicate initialization
 
-        # 计算VWAP: 当前周期的成交额和成交量
-        price_vol = self.data.close[0] * self.data.volume[0] * 1e9  # 转换成交量单位
-        volume = self.data.volume[0] * 1e9  # 转换成交量单位
+        # Calculate VWAP: current period's total value and volume
+        price_vol = self.data.close[0] * self.data.volume[0] * 1e9  # Convert volume unit
+        volume = self.data.volume[0] * 1e9  # Convert volume unit
 
-        # 确保 volume 不为零
+        # Ensure volume is not zero
         if volume == 0:
-            print("成交量为零，设置为1")
+            print("Volume is zero, setting to 1")
             volume = 1
 
-        # 累加成交额和成交量
+        # Accumulate total value and volume
         self.total_vol += volume
         self.total_value += price_vol
 
-        # 计算VWAP: 累计成交额 / 累计成交量
+        # Calculate VWAP: cumulative total value / cumulative volume
         if self.total_vol != 0:
             self.lines.vwap[0] = self.total_value / self.total_vol
         else:
